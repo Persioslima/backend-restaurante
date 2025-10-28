@@ -10,7 +10,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
 import java.util.Arrays;
+
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -25,32 +27,46 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-                .csrf(csrf -> csrf.disable())
-                .authorizeHttpRequests(authorize -> authorize
-                        // Libera todas as páginas e recursos estáticos
-                        .requestMatchers("/", "/index.html", "/cadastro.html", "/clientes.html", "/restaurante.html", "/dados.html", "/itens.html", "/avaliacao.html", "/restaurantePerfil.html", "/pedidos.html", "/css/**", "/js/**", "/uploads/**").permitAll()
-                        // Libera todos os endpoints de clientes e restaurantes para acesso público
-                        .requestMatchers("/clientes/**", "/restaurantes/**").permitAll()
-                        // Permite leitura pública de itens e avaliações (GET)
-                        .requestMatchers(HttpMethod.GET, "/itens/**", "/avaliacoes/**", "/avaliacoes-prato/**").permitAll()
-                        // Libera gerenciamento de itens via páginas estáticas (POST/PUT/DELETE)
-                        .requestMatchers(HttpMethod.POST, "/itens/**").permitAll()
-                        .requestMatchers(HttpMethod.PUT, "/itens/**").permitAll()
-                        .requestMatchers(HttpMethod.DELETE, "/itens/**").permitAll()
-                        // Garante que pedidos exijam autenticação
-                        .anyRequest().authenticated()
-                )
-                .formLogin(form -> form
-                        .loginProcessingUrl("/login")
-                        .permitAll()
-                )
-                .logout(logout -> logout
-                        .logoutUrl("/logout")
-                        .deleteCookies("JSESSIONID")
-                        .invalidateHttpSession(true)
-                        .permitAll()
-                );
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .authorizeHttpRequests(auth -> auth
+                    // Swagger (libera acesso público à documentação)
+                    .requestMatchers(
+                            "/swagger-ui/**",
+                            "/v3/api-docs/**",
+                            "/api-docs/**",
+                            "/swagger-ui.html"
+                    ).permitAll()
+
+                    // Páginas e recursos estáticos
+                    .requestMatchers("/", "/index.html", "/cadastro.html", "/clientes.html",
+                            "/restaurante.html", "/dados.html", "/itens.html", "/avaliacao.html",
+                            "/restaurantePerfil.html", "/pedidos.html", "/css/**", "/js/**", "/uploads/**")
+                            .permitAll()
+
+                    // Endpoints públicos
+                    .requestMatchers("/clientes/**", "/restaurantes/**").permitAll()
+                    .requestMatchers(HttpMethod.GET, "/itens/**", "/avaliacoes/**", "/avaliacoes-prato/**").permitAll()
+
+                    // Gerenciamento de itens (temporariamente públicos)
+                    .requestMatchers(HttpMethod.POST, "/itens/**").permitAll()
+                    .requestMatchers(HttpMethod.PUT, "/itens/**").permitAll()
+                    .requestMatchers(HttpMethod.DELETE, "/itens/**").permitAll()
+
+                    // Todo o resto requer autenticação
+                    .anyRequest().authenticated()
+            )
+            .formLogin(form -> form
+                    .loginProcessingUrl("/login")
+                    .permitAll()
+            )
+            .logout(logout -> logout
+                    .logoutUrl("/logout")
+                    .deleteCookies("JSESSIONID")
+                    .invalidateHttpSession(true)
+                    .permitAll()
+            );
+
         return http.build();
     }
 
@@ -63,10 +79,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Permite credenciais
         configuration.setAllowCredentials(true);
 
-        // Lista específica de origens permitidas (mais seguro)
         configuration.setAllowedOrigins(Arrays.asList(
                 "http://localhost:8081",
                 "http://127.0.0.1:8081",
@@ -74,31 +88,20 @@ public class SecurityConfig {
                 "http://127.0.0.1:3000"
         ));
 
-        // Métodos permitidos
         configuration.setAllowedMethods(Arrays.asList(
                 "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"
         ));
 
-        // Headers permitidos
         configuration.setAllowedHeaders(Arrays.asList(
-                "Authorization",
-                "Content-Type",
-                "X-Requested-With",
-                "Accept",
-                "Origin",
-                "Access-Control-Request-Method",
-                "Access-Control-Request-Headers"
+                "Authorization", "Content-Type", "X-Requested-With", "Accept", "Origin",
+                "Access-Control-Request-Method", "Access-Control-Request-Headers"
         ));
 
-        // Headers expostos
         configuration.setExposedHeaders(Arrays.asList(
-                "Location",
-                "Content-Disposition",
-                "Access-Control-Allow-Origin",
+                "Location", "Content-Disposition", "Access-Control-Allow-Origin",
                 "Access-Control-Allow-Credentials"
         ));
 
-        // Tempo de cache para preflight
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
@@ -109,14 +112,10 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService(ClienteRepository clienteRepository) {
         return username -> clienteRepository.findByEmail(username)
-                .map(cliente -> {
-                    UserDetails user = User
-                            .withUsername(cliente.getEmail())
-                            .password(cliente.getSenha())
-                            .roles("USER")
-                            .build();
-                    return user;
-                })
+                .map(cliente -> User.withUsername(cliente.getEmail())
+                        .password(cliente.getSenha())
+                        .roles("USER")
+                        .build())
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado"));
     }
 }
